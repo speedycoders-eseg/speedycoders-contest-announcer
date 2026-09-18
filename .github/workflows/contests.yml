@@ -1,0 +1,70 @@
+name: Contest announcer
+on:
+  schedule:
+    - cron: '17 */3 * * *'
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Simular sem enviar mensagens ou alterar estado'
+        type: boolean
+        default: true
+permissions:
+  contents: write
+concurrency:
+  group: contest-announcer
+  cancel-in-progress: false
+jobs:
+  announce:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          fetch-depth: 0
+      - name: Instalar dependências
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y libcurl4-openssl-dev libxml2-dev nlohmann-json3-dev
+      - name: Compilar e testar
+        run: |
+          cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+          cmake --build build --parallel 2
+          ctest --test-dir build --output-on-failure
+      - name: Divulgar contests
+        env:
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+          DRY_RUN: ${{ inputs.dry_run || false }}
+        run: |
+          if [ "$DRY_RUN" = true ]; then
+            ./build/contest-announcer --dry-run
+          else
+            ./build/contest-announcer
+          fi
+      - name: Persistir envios confirmados, inclusive após falha parcial
+        if: ${{ always() && !cancelled() }}
+        env:
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+        run: |
+          if [ ! -d .git ] || git diff --quiet -- data/state.json; then
+            exit 0
+          fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add data/state.json
+          git commit -m 'chore: persist contest notification state'
+          for attempt in 1 2 3; do
+            git pull --rebase origin "$DEFAULT_BRANCH"
+            if git push origin "HEAD:$DEFAULT_BRANCH"; then
+              exit 0
+            fi
+            sleep 2
+          done
+          exit 1
+      - name: Guardar estado para recuperação se o job falhar
+        if: ${{ failure() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: notification-state-${{ github.run_id }}
+          path: data/state.json
+          retention-days: 14

@@ -1,0 +1,19 @@
+name: C++20 checks
+on:
+  push:
+    paths-ignore: ['data/state.json', '**.md']
+  pull_request:
+    paths-ignore: ['data/state.json', '**.md']
+permissions:
+  contents: read
+jobs:
+  test:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y libcurl4-openssl-dev libxml2-dev nlohmann-json3-dev
+          cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+          cmake --build build --parallel 2
+          ctest --test-dir build --output-on-failure
