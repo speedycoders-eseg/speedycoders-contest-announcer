@@ -7,6 +7,12 @@ using namespace bot;
 void check(bool ok) { if(!ok) throw std::runtime_error("Teste falhou"); }
 template<class F> void throws(F fn) {bool caught=false;try{fn();}catch(const std::exception&){caught=true;}check(caught);}
 int main() {
+    check(normalize_webhook("https://discordapp.com/api/webhooks/123/test-token") == "https://discord.com/api/webhooks/123/test-token");
+    check(normalize_webhook("https://discord.com/api/webhooks/123/test-token") == "https://discord.com/api/webhooks/123/test-token");
+    check(normalize_webhook("https://canary.discordapp.com/api/webhooks/123/test-token") == "https://canary.discord.com/api/webhooks/123/test-token");
+    throws([]{normalize_webhook("https://discordapp.com.evil.com/api/webhooks/123/test-token");});
+    throws([]{normalize_webhook("https://discordapp.com/api/webhooks/123/test-token/github");});
+    throws([]{normalize_webhook("https://discordapp.com/api/webhooks");});
     check(classify("Codeforces","Round (Div. 1 + Div. 2)","")=="Div. 1 + Div. 2");
     check(classify("Codeforces","Educational Round (Rated for Div. 2)","")=="Educational + Div. 2");
     check(classify("Codeforces","Round Div.4","")=="Div. 4");

@@ -182,12 +182,19 @@ std::string get(const std::string& url) {
     }
     throw std::runtime_error("Consulta HTTP falhou após 3 tentativas");
 }
-void post(const std::string& webhook,const json& body) {
-    if (!std::regex_match(webhook,std::regex(R"(https://(canary\.|ptb\.)?discord\.com/api/webhooks/[0-9]+/[A-Za-z0-9._-]+)")))
+std::string normalize_webhook(const std::string& webhook) {
+    if (!std::regex_match(webhook,std::regex(R"(https://(canary\.|ptb\.)?discord(app)?\.com/api/webhooks/[0-9]+/[A-Za-z0-9._-]+)")))
         throw std::runtime_error("DISCORD_WEBHOOK_URL inválida; use a URL padrão sem /github ou parâmetros");
+    auto url=webhook;
+    const auto legacy=url.find("discordapp.com");
+    if (legacy!=std::string::npos) url.replace(legacy,14,"discord.com");
+    return url;
+}
+void post(const std::string& webhook,const json& body) {
+    const auto url=normalize_webhook(webhook);
     auto encoded=body.dump();
     for (int i=0;i<4;++i) {
-        auto r=request(webhook+"?wait=true",&encoded);
+        auto r=request(url+"?wait=true",&encoded);
         if (r.status>=200 && r.status<300) { std::this_thread::sleep_for(std::chrono::milliseconds(500)); return; }
         if (r.status!=429 || i==3) throw std::runtime_error("Discord HTTP "+std::to_string(r.status));
         double delay=json::parse(r.body).at("retry_after").get<double>();

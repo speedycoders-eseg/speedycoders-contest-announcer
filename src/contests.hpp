@@ -18,5 +18,6 @@ json payload(const Contest& c, const std::string& kind);
 void process(const std::vector<Contest>& contests, json& state, const std::function<int64_t()>& now,
              const std::function<void(const json&)>& send, const std::function<void()>& checkpoint);
 std::string get(const std::string& url);
+std::string normalize_webhook(const std::string& webhook);
 void post(const std::string& webhook, const json& body);
 }
